@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>RRG Cash Bids</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --crimson:      #7a1020;
+    --crimson-dark: #4d0b15;
+    --crimson-rim:  #a01828;
+    --gold:         #c8933a;
+    --gold-light:   #e8b45a;
+    --gold-dim:     #8a6020;
+    --bg:           #0b0909;
+    --surface:      #151010;
+    --surface2:     #1e1515;
+    --border:       #2a1a1a;
+    --border-light: #3a2020;
+    --text:         #ede5dc;
+    --muted:        #8a7a6a;
+    --faint:        #4a3a30;
+    --green:        #3db864;
+    --red:          #d94848;
+    --orange:       #d4823a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100dvh;
+    padding: 16px 12px 48px;
+    /* subtle grain texture */
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"),
+      radial-gradient(ellipse at 15% 5%, rgba(122,16,32,0.18) 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 95%, rgba(122,16,32,0.12) 0%, transparent 55%);
+  }
+
+  .widget { max-width: 680px; margin: 0 auto; }
+
+  /* ─── HEADER ─── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border-light);
+    position: relative;
+    gap: 8px;
+  }
+  /* accent line */
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0;
+    width: 48px; height: 2px;
+    background: var(--crimson-rim);
+  }
+
+  .brand {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.3em; color: var(--gold-dim);
+    text-transform: uppercase; margin-bottom: 2px;
+  }
+  .brand a { color: inherit; text-decoration: none; }
+
+  .title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 30px; font-weight: 800;
+    line-height: 0.95; letter-spacing: 0.03em;
+    color: var(--text); text-transform: uppercase;
+  }
+
+  .loc-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-top: 5px;
+    background: var(--crimson-dark);
+    border: 1px solid var(--crimson);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(237,229,220,0.75);
+    padding: 2px 8px 2px 6px;
+  }
+  .loc-chip::before {
+    content: '';
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--crimson-rim);
+    flex-shrink: 0;
+  }
+
+  /* right side */
+  .hdr-right {
+    display: flex; flex-direction: column;
+    align-items: flex-end; gap: 6px; flex-shrink: 0;
+    padding-top: 2px;
+  }
+
+  .status-row {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 8.5px; letter-spacing: 0.07em; color: var(--muted);
+    white-space: nowrap;
+  }
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    background: var(--faint);
+  }
+  .dot.live    { background: var(--green);  animation: blink 2.4s ease-in-out infinite; }
+  .dot.loading { background: var(--gold);   animation: blink 0.7s ease-in-out infinite; }
+  .dot.stale   { background: var(--orange); }
+  .dot.error   { background: var(--red);    }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .btn-row { display: flex; gap: 5px; }
+
+  .btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 5px 11px; border: 1px solid;
+    background: none; cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    white-space: nowrap; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px;
+    line-height: 1; -webkit-tap-highlight-color: transparent;
+  }
+  .btn-primary { color: var(--gold); border-color: var(--gold-dim); }
+  .btn-primary:not(:disabled):active,
+  .btn-primary:not(:disabled):hover { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+  .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-ghost { color: var(--muted); border-color: var(--border); }
+  .btn-ghost:active, .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { animation: spin 0.65s linear infinite; display: inline-block; }
+
+  /* ─── BANNERS ─── */
+  .banner {
+    font-size: 9.5px; letter-spacing: 0.05em; line-height: 1.55;
+    padding: 8px 11px; margin-bottom: 12px; display: none;
+  }
+  .banner-warn {
+    background: rgba(200,147,58,0.08);
+    border: 1px solid rgba(200,147,58,0.3);
+    color: var(--gold);
+  }
+  .banner-err {
+    background: rgba(217,72,72,0.08);
+    border: 1px solid rgba(217,72,72,0.4);
+    color: var(--red);
+  }
+  .banner-stale {
+    background: rgba(212,130,58,0.08);
+    border: 1px solid rgba(212,130,58,0.3);
+    color: var(--orange);
+  }
+
+  /* ─── COMMODITY BLOCK ─── */
+  .block {
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .block-hdr {
+    background: var(--crimson-dark);
+    border-bottom: 1px solid var(--crimson);
+    padding: 6px 11px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .block-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px; font-weight: 800;
+    letter-spacing: 0.09em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .block-tag {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px; font-weight: 600;
+    letter-spacing: 0.12em; color: var(--gold-dim);
+    text-transform: uppercase;
+  }
+
+  /* ─── TABLE ─── */
+  table { width: 100%; border-collapse: collapse; }
+
+  thead th {
+    background: var(--surface2);
+    padding: 5px 11px;
+    font-size: 7.5px; font-weight: 600;
+    letter-spacing: 0.2em; color: var(--faint);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  thead th:not(:first-child) { text-align: right; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:active { background: rgba(122,16,32,0.2); }
+
+  td { padding: 7px 11px; vertical-align: middle; }
+  td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .d-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.04em;
+    color: var(--text);
+  }
+
+  .chg  { font-size: 10px; color: var(--red);   font-weight: 500; }
+  .bas  { font-size: 10px; color: var(--muted); }
+
+  .price {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px; font-weight: 800;
+    color: var(--gold-light); letter-spacing: 0.01em;
+    line-height: 1;
+  }
+
+  /* row divider — every other row very slightly lighter */
+  tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
+
+  /* ─── FOOTER ─── */
+  .footer {
+    margin-top: 14px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between;
+    align-items: center; flex-wrap: wrap; gap: 6px;
+  }
+  .disc {
+    font-size: 7.5px; color: var(--faint);
+    letter-spacing: 0.07em; line-height: 1.6;
+  }
+  .disc a { color: var(--gold-dim); text-decoration: none; }
+  .dtn {
+    font-size: 7.5px; color: var(--faint);
+    letter-spacing: 0.12em;
+    border: 1px solid var(--border); padding: 2px 6px;
+  }
+
+  /* ─── COUNTDOWN RING ─── */
+  .countdown-wrap {
+    display: none;
+    align-items: center; gap: 6px;
+    font-size: 8.5px; color: var(--muted); letter-spacing: 0.07em;
+  }
+  .countdown-wrap.visible { display: flex; }
+  .ring {
+    width: 18px; height: 18px; flex-shrink: 0;
+  }
+  .ring-track { fill: none; stroke: var(--border); stroke-width: 3; }
+  .ring-fill  {
+    fill: none; stroke: var(--gold); stroke-width: 3;
+    stroke-linecap: round;
+    transform-origin: 50% 50%;
+    transform: rotate(-90deg);
+    stroke-dasharray: 44;
+    stroke-dashoffset: 44;
+    transition: stroke-dashoffset 1s linear;
+  }
+</style>
+</head>
+<body>
+<div class="widget">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <div class="brand"><a href="https://www.redrivergrain.com/" target="_blank">Red River Grain Co.</a></div>
+      <div class="title">Cash Bids</div>
+      <div class="loc-chip">RRG Breck</div>
+    </div>
+    <div class="hdr-right">
+      <div class="status-row">
+        <span class="dot" id="dot"></span>
+        <span id="statusTxt">—</span>
+      </div>
+      <!-- countdown ring shown when auto-refresh is counting down -->
+      <div class="countdown-wrap" id="cdWrap">
+        <svg class="ring" viewBox="0 0 18 18">
+          <circle class="ring-track" cx="9" cy="9" r="7"/>
+          <circle class="ring-fill"  cx="9" cy="9" r="7" id="ringFill"/>
+        </svg>
+        <span id="cdTxt">—</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="refreshBtn" onclick="manualRefresh()">
+          <span id="refreshIcon">⟳</span> Refresh
+        </button>
+        <a class="btn btn-ghost" href="https://www.redrivergrain.com/index.cfm?show=11&mid=3" target="_blank">
+          Live ↗
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- BANNERS -->
+  <div class="banner banner-warn" id="coldBanner">
+    ⏳ Server waking up — first load can take ~30 s on the free tier. Hang tight…
+  </div>
+  <div class="banner banner-err"   id="errBanner"></div>
+  <div class="banner banner-stale" id="staleBanner"></div>
+
+  <!-- CORN -->
+  <div class="block">
+    <div class="block-hdr">
+      <span class="block-name">🌽 Corn</span>
+      <span class="block-tag">RRG Breck</span>
+    </div>
+    <table>
+      <thead><tr><th>Delivery</th><th>Futures Chg</th><th>Basis</th><th>Cash Price</th></tr></thead>
+      <tbody id="cornBody">
+        <tr><td><span class="d-label">June</span></td>    <td class="chg">−9'0</td>  <td class="bas">−0.60</td><td class="price">3.71</td></tr>
+        <tr><td><span class="d-label">July</span></td>    <td class="chg">−9'0</td>  <td class="bas">−0.60</td><td class="price">3.71</td></tr>
+        <tr><td><span class="d-label">N/C 2026</span></td><td class="chg">−6'6</td>  <td class="bas">−0.60</td><td class="price">3.99</td></tr>
+        <tr><td><span class="d-label">December</span></td><td class="chg">−6'6</td>  <td class="bas">−0.50</td><td class="price">4.09</td></tr>
+        <tr><td><span class="d-label">February</span></td><td class="chg">−6'4</td>  <td class="bas">−0.60</td><td class="price">4.14</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SOYBEANS -->
+  <div class="block">
+    <div class="block-hdr">
+      <span class="block-name">🌱 Soybeans</span>
+      <span class="block-tag">RRG Breck</span>
+    </div>
+    <table>
+      <thead><tr><th>Delivery</th><th>Futures Chg</th><th>Basis</th><th>Cash Price</th></tr></thead>
+      <tbody id="soyBody">
+        <tr><td><span class="d-label">June</span></td>    <td class="chg">−11'2</td> <td class="bas">−0.90</td><td class="price">10.64</td></tr>
+        <tr><td><span class="d-label">July</span></td>    <td class="chg">−11'2</td> <td class="bas">−0.95</td><td class="price">10.59</td></tr>
+        <tr><td><span class="d-label">N/C 2026</span></td><td class="chg">−10'4</td> <td class="bas">−0.90</td><td class="price">10.77</td></tr>
+        <tr><td><span class="d-label">January</span></td> <td class="chg">−10'0</td> <td class="bas">−0.90</td><td class="price">10.91</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SPRING WHEAT -->
+  <div class="block">
+    <div class="block-hdr">
+      <span class="block-name">🌾 Spring Wheat</span>
+      <span class="block-tag">Milling Quality · RRG Breck</span>
+    </div>
+    <table>
+      <thead><tr><th>Delivery</th><th>Futures Chg</th><th>Basis</th><th>Cash Price</th></tr></thead>
+      <tbody id="wheatBody">
+        <tr><td><span class="d-label">June</span></td>    <td class="chg">−0.1075</td><td class="bas">−0.55</td><td class="price">5.71</td></tr>
+        <tr><td><span class="d-label">July</span></td>    <td class="chg">−0.1075</td><td class="bas">−0.60</td><td class="price">5.66</td></tr>
+        <tr><td><span class="d-label">N/C 2026</span></td><td class="chg">−0.1050</td><td class="bas">−0.60</td><td class="price">5.91</td></tr>
+        <tr><td><span class="d-label">November</span></td><td class="chg">−0.0975</td><td class="bas">−0.60</td><td class="price">6.11</td></tr>
+        <tr><td><span class="d-label">January</span></td> <td class="chg">−0.0900</td><td class="bas">−0.60</td><td class="price">6.28</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <div class="disc">
+      Bids subject to change · <a href="https://www.redrivergrain.com/" target="_blank">redrivergrain.com</a> · RRG Breck
+    </div>
+    <div class="dtn">POWERED BY DTN</div>
+  </div>
+
+</div><!-- /widget -->
+
+<script>
+  // ─── CONFIG ──────────────────────────────────────────────────────────────────
+  // Once your Render scraper is deployed, replace this with your URL.
+  // Until then the widget shows the hardcoded snapshot data and the refresh
+  // button will open the live RRG page as a fallback.
+  const API_BASE = "https://rrg-scraper-1.onrender.com";
+
+  // Auto-refresh interval while the page is open (ms). 15 min.
+  const AUTO_REFRESH_MS = 15 * 60 * 1000;
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  let isFetching  = false;
+  let autoTimer   = null;
+  let cdInterval  = null;
+  let coldTimer   = null;
+  let cdRemaining = 0;
+
+  // ── Status helpers ──
+  function setDot(cls) {
+    document.getElementById("dot").className = "dot " + cls;
+  }
+  function setStatus(dotCls, txt) {
+    setDot(dotCls);
+    document.getElementById("statusTxt").textContent = txt;
+  }
+
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+         + "  " + d.toLocaleDateString([], { month: "short", day: "numeric" });
+  }
+
+  // ── Countdown ring ──
+  const CIRCUMFERENCE = 44; // 2π × r=7 ≈ 43.98
+
+  function startCountdown(ms) {
+    stopCountdown();
+    cdRemaining = ms;
+    document.getElementById("cdWrap").classList.add("visible");
+    updateRing(ms, ms);
+
+    cdInterval = setInterval(() => {
+      cdRemaining -= 1000;
+      if (cdRemaining <= 0) {
+        stopCountdown();
+        return;
+      }
+      updateRing(cdRemaining, ms);
+      const m = Math.floor(cdRemaining / 60000);
+      const s = Math.floor((cdRemaining % 60000) / 1000);
+      document.getElementById("cdTxt").textContent =
+        "next " + (m > 0 ? m + "m " : "") + s + "s";
+    }, 1000);
+  }
+
+  function stopCountdown() {
+    clearInterval(cdInterval);
+    cdInterval = null;
+    document.getElementById("cdWrap").classList.remove("visible");
+  }
+
+  function updateRing(remaining, total) {
+    const pct = remaining / total;
+    const offset = CIRCUMFERENCE * (1 - pct);
+    document.getElementById("ringFill").style.strokeDashoffset = offset;
+  }
+
+  // ── Render rows ──
+  function rowsHtml(rows) {
+    if (!rows || !rows.length)
+      return `<tr><td colspan="4" style="color:var(--muted);font-size:10px;padding:9px 11px;letter-spacing:.05em">No bids available</td></tr>`;
+    return rows.map(r =>
+      `<tr>
+        <td><span class="d-label">${r.delivery}</span></td>
+        <td class="chg">${r.futuresChange}</td>
+        <td class="bas">${r.basis}</td>
+        <td class="price">${r.cashPrice}</td>
+      </tr>`
+    ).join("");
+  }
+
+  function findKey(data, ...kws) {
+    return Object.keys(data).find(k =>
+      kws.every(kw => k.toUpperCase().includes(kw.toUpperCase()))
+    ) || null;
+  }
+
+  function applyData(json) {
+    const d = json.data || {};
+    const ck = findKey(d, "CORN");
+    const sk = findKey(d, "SOYBEAN");
+    const wk = findKey(d, "MILLING QUALITY") || findKey(d, "SPRING WHEAT");
+
+    document.getElementById("cornBody").innerHTML  = rowsHtml(ck ? d[ck] : []);
+    document.getElementById("soyBody").innerHTML   = rowsHtml(sk ? d[sk] : []);
+    document.getElementById("wheatBody").innerHTML = rowsHtml(wk ? d[wk] : []);
+
+    hide("errBanner");
+    if (json.stale) {
+      setStatus("stale", "Stale · " + fmtTime(json.fetchedAt));
+      show("staleBanner", "⚠ Live fetch failed — showing last known data (" + fmtTime(json.fetchedAt) + ")");
+    } else {
+      setStatus("live", fmtTime(json.fetchedAt));
+      hide("staleBanner");
+    }
+  }
+
+  function show(id, txt) {
+    const el = document.getElementById(id);
+    if (txt !== undefined) el.textContent = txt;
+    el.style.display = "block";
+  }
+  function hide(id) { document.getElementById(id).style.display = "none"; }
+
+  // ── Set button to spinning state ──
+  function setBtnLoading(on) {
+    const btn  = document.getElementById("refreshBtn");
+    const icon = document.getElementById("refreshIcon");
+    btn.disabled = on;
+    icon.className = on ? "spin" : "";
+    icon.textContent = "⟳";
+  }
+
+  // ── Schedule next auto-refresh ──
+  function scheduleNext() {
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(() => fetchBids(false), AUTO_REFRESH_MS);
+    startCountdown(AUTO_REFRESH_MS);
+  }
+
+  // ── Core fetch ──
+  async function fetchBids(manual = false) {
+    if (isFetching) return;
+
+    // No API configured — open the live site instead
+    if (!API_BASE) {
+      window.open("https://www.redrivergrain.com/index.cfm?show=11&mid=3", "_blank");
+      return;
+    }
+
+    isFetching = true;
+    stopCountdown();
+    setBtnLoading(true);
+    hide("errBanner"); hide("staleBanner"); hide("coldBanner");
+    setStatus("loading", "Fetching…");
+
+    // Cold-start warning after 5 s
+    coldTimer = setTimeout(() => show("coldBanner"), 5000);
+
+    const url = API_BASE + "/bids" + (manual ? "?refresh=1" : "");
+
+    try {
+      const res = await fetch(url);
+      clearTimeout(coldTimer);
+      hide("coldBanner");
+
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const json = await res.json();
+      applyData(json);
+      scheduleNext();
+    } catch (err) {
+      clearTimeout(coldTimer);
+      hide("coldBanner");
+      setStatus("error", "Failed");
+      show("errBanner",
+        "Could not reach the server. Check your connection and try again. (" + err.message + ")"
+      );
+      // Still reschedule so it retries automatically
+      scheduleNext();
+    }
+
+    setBtnLoading(false);
+    isFetching = false;
+  }
+
+  function manualRefresh() { fetchBids(true); }
+
+  // ── Init ──
+  // Show today's date next to the static data while API isn't set up
+  if (!API_BASE) {
+    setStatus("stale", "Snapshot · " + new Date().toLocaleDateString([], { month: "short", day: "numeric" }));
+  } else {
+    fetchBids(false);
+  }
+</script>
+</body>
+</html>
